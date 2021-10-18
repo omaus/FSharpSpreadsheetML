@@ -15,6 +15,7 @@
     <Compile Include="Sheet.fs" />
     <Compile Include="Table.fs" />
     <Compile Include="WorkSheet.fs" />
+    <Compile Include="Columns.fs" />
     <Compile Include="Workbook.fs" />
     <Compile Include="Spreadsheet.fs" />
   </ItemGroup>
