@@ -9,17 +9,20 @@ open DocumentFormat.OpenXml.Spreadsheet
 /// Functions for working the spreadsheet document.
 module Spreadsheet = 
 
-    /// Opens the spreadsheet located at the given path and initialized a FileStream.
+    /// Opens the SpreadsheetDocument located at the given path and initialized a FileStream.
     let fromFile (path : string) isEditable = SpreadsheetDocument.Open(path,isEditable)
 
-    /// Opens the spreadsheet from the given FileStream.
+    /// Opens the SpreadsheetDocument from the given FileStream.
     let fromStream (stream : System.IO.Stream) isEditable = SpreadsheetDocument.Open(stream,isEditable)
 
-    /// Initializes a new empty spreadsheet at the given path.
+    /// Initializes a new empty SpreadsheetDocument at the given path.
     let initEmpty (path : string) = SpreadsheetDocument.Create(path, SpreadsheetDocumentType.Workbook)
 
-    // Gets the workbookPart of the spreadsheet.
+    /// Gets the WorkbookPart of the SpreadsheetDocument.
     let getWorkbookPart (spreadsheet : SpreadsheetDocument) = spreadsheet.WorkbookPart
+
+    /// Gets the Workbook of the SpreadsheetDocument's WorkbookPart.
+    let getWorkbook (spreadsheet : SpreadsheetDocument) = getWorkbookPart spreadsheet |> Workbook.get
 
     // Only if none there
     /// Initialized a new workbookPart in the spreadsheetDocument but only if there is none.
@@ -57,16 +60,16 @@ module Spreadsheet =
 
         doc
 
-    // Gets the sharedStringTable of a spreadsheet.
+    // Gets the SharedStringTable from the SharedStringTablePart of a SpreadsheetDocument's WorkbookPart.
     let getSharedStringTable (spreadsheetDocument : SpreadsheetDocument) =
         spreadsheetDocument.WorkbookPart.SharedStringTablePart.SharedStringTable
 
-    // Gets the sharedStringTable of the spreadsheet if it exists, else returns None.
+    // Gets the SharedStringTable from the SharedStringTablePart of a SpreadsheetDocument's WorkbookPart if it exists, else returns None.
     let tryGetSharedStringTable (spreadsheetDocument : SpreadsheetDocument) =
         try spreadsheetDocument.WorkbookPart.SharedStringTablePart.SharedStringTable |> Some
         with | _ -> None
 
-    // Gets the sharedStringTablePart. If it does not exist, creates a new one.
+    // Gets the SharedStringTablePart of a SpreadsheetDocument's WorkbookPart. If it does not exist, creates a new one.
     let getOrInitSharedStringTablePart (spreadsheetDocument : SpreadsheetDocument) =
         let workbookPart = spreadsheetDocument.WorkbookPart    
         let sstp = workbookPart.GetPartsOfType<SharedStringTablePart>()
@@ -74,40 +77,86 @@ module Spreadsheet =
         | Some sst -> sst
         | None -> workbookPart.AddNewPart<SharedStringTablePart>()
 
-    /// Returns the worksheetPart associated to the sheet with the given name.
+    /// Returns the WorksheetPart associated to the sheet with the given name if it exists. Else returns None.
     let tryGetWorksheetPartBySheetName (name : string) (spreadsheetDocument : SpreadsheetDocument) =
         Sheet.tryItemByName name spreadsheetDocument
         |> Option.map (fun sheet -> 
-            spreadsheetDocument.WorkbookPart
-            |> Worksheet.WorksheetPart.getByID sheet.Id.Value 
-        )      
+            let sheetId = Sheet.getID sheet
+            getWorkbookPart spreadsheetDocument
+            |> Worksheet.WorksheetPart.getByID sheetId
+        )
 
-    /// Returns the worksheetPart for the given 0-based sheetIndex of the given spreadsheetDocument. 
+    /// Returns the WorksheetPart associated to the sheet with the given name.
+    let getWorksheetPartBySheetName (name : string) (spreadsheetDocument : SpreadsheetDocument) =
+        tryGetWorksheetPartBySheetName name spreadsheetDocument |> Option.get
+
+    /// Returns the Worksheet associated to the sheet with the given name if it exists. Else returns None.
+    let tryGetWorksheetBySheetName (name : string) (spreadsheetDocument : SpreadsheetDocument) =
+        match tryGetWorksheetPartBySheetName name spreadsheetDocument with
+        | Some wsp  -> Some (Worksheet.get wsp)
+        | None      -> None
+
+    /// Returns the Worksheet associated to the sheet with the given name.
+    let getWorksheetBySheetName (name : string) (spreadsheetDocument : SpreadsheetDocument) =
+        tryGetWorksheetBySheetName name spreadsheetDocument |> Option.get
+    
+    /// Returns the WorksheetPart for the given 0-based sheetIndex of the given SpreadsheetDocument if it exists. Else returns None.
     let tryGetWorksheetPartBySheetIndex (sheetIndex : uint) (spreadsheetDocument : SpreadsheetDocument) =
         Sheet.tryItem sheetIndex spreadsheetDocument
         |> Option.map (fun sheet -> 
             spreadsheetDocument.WorkbookPart
             |> Worksheet.WorksheetPart.getByID sheet.Id.Value 
-        )   
+        )
+
+    /// Returns the WorksheetPart for the given 0-based sheetIndex of the given SpreadsheetDocument. 
+    let getWorksheetPartBySheetIndex (sheetIndex : uint) (spreadsheetDocument : SpreadsheetDocument) =
+        tryGetWorksheetPartBySheetIndex sheetIndex spreadsheetDocument |> Option.get
+
+    /// Returns the Worksheet for the given 0-based sheetIndex of the given SpreadsheetDocument if it exists. Else returns None.
+    let tryGetWorksheetBySheetIndex (sheetIndex : uint) (spreadsheetDocument : SpreadsheetDocument) =
+        match tryGetWorksheetPartBySheetIndex sheetIndex spreadsheetDocument with
+        | Some wsp  -> Some (Worksheet.get wsp)
+        | None      -> None
+
+    /// Returns the Worksheet for the given 0-based sheetIndex of the given SpreadsheetDocument.
+    let getWorksheetBySheetIndex (sheetIndex : uint) (spreadsheetDocument : SpreadsheetDocument) =
+        tryGetWorksheetBySheetIndex sheetIndex spreadsheetDocument |> Option.get
         
-    /// Returns the sheetData for the given 0-based sheetIndex of the given spreadsheetDocument if it exists. Else returns None.
+    /// Returns the SheetData for the given Sheet's name of the given SpreadsheetDocument if it exists. Else returns None.
     let tryGetSheetBySheetName (name : string) (spreadsheetDocument : SpreadsheetDocument) =
         tryGetWorksheetPartBySheetName name spreadsheetDocument
         |> Option.map (Worksheet.get >> Worksheet.getSheetData)
 
-    /// Returns the sheetData for the given 0-based sheetIndex of the given spreadsheetDocument. 
+    /// Returns the SheetData for the given Sheet's name of the given SpreadsheetDocument.
+    let getSheetBySheetName (name : string) (spreadsheetDocument : SpreadsheetDocument) =
+        tryGetSheetBySheetName name spreadsheetDocument |> Option.get
+
+    /// Returns the SheetData for the given 0-based sheetIndex of the given SpreadsheetDocument if it exists. Else returns None.
     let tryGetSheetBySheetIndex (sheetIndex : uint) (spreadsheetDocument : SpreadsheetDocument) =
         tryGetWorksheetPartBySheetIndex sheetIndex spreadsheetDocument
         |> Option.map (Worksheet.get >> Worksheet.getSheetData)
-        
 
-    /// Returns a sequence of rows containing the cells for the given 0-based sheetIndex of the given spreadsheetDocument. 
+    /// Returns the SheetData for the given 0-based sheetIndex of the given SpreadsheetDocument.
+    let getSheetBySheetIndex (sheetIndex : uint) (spreadsheetDocument : SpreadsheetDocument) =
+        tryGetSheetBySheetIndex sheetIndex spreadsheetDocument |> Option.get
+        
+    let tryGetSheetNameBySheetIndex (sheetIndex : uint) (spreadsheetDocument : SpreadsheetDocument) =
+        match Sheet.tryItem sheetIndex spreadsheetDocument with
+        | Some sheet    -> Some (Sheet.getName sheet)
+        | None          -> None
+    
+    /// Returns the name of the Sheet with the given index of the given SpreadsheetDocument.
+    let getSheetNameBySheetIndex (sheetIndex : uint) (spreadsheetDocument : SpreadsheetDocument) = 
+        (tryGetSheetNameBySheetIndex sheetIndex spreadsheetDocument).Value
+
+    /// Returns a sequence of rows containing the cells for the given 0-based sheetIndex of the given SpreadsheetDocument. 
     let getRowsBySheetIndex (sheetIndex : uint) (spreadsheetDocument : SpreadsheetDocument) =
 
         match (Sheet.tryItem sheetIndex spreadsheetDocument) with
         | Some (sheet) ->
-            let workbookPart = spreadsheetDocument.WorkbookPart
-            let worksheetPart = Worksheet.WorksheetPart.getByID sheet.Id.Value workbookPart     
+            let workbookPart = getWorkbookPart spreadsheetDocument
+            let sheedId = Sheet.getID sheet
+            let worksheetPart = Worksheet.WorksheetPart.getByID sheedId workbookPart     
             let stringTablePart = getOrInitSharedStringTablePart spreadsheetDocument
             seq {
             use reader = OpenXmlReader.Create(worksheetPart)
